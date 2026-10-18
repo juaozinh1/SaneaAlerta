@@ -16,7 +16,11 @@ export default function CardDenuncia({ denuncia, usuario, onApoiar, onExcluir })
   return (
     <article className="card">
       <img
-        src={denuncia.fotoUrl || "https://placehold.co/600x400?text=Sem+Foto"}
+      src={
+        denuncia.fotoUrl && denuncia.fotoUrl.trim() !== ""
+         ? denuncia.fotoUrl
+         : "https://placehold.co/600x400?text=Sem+Foto+Anexada"
+        }
         alt={denuncia.titulo}
         className="card-image"
       />

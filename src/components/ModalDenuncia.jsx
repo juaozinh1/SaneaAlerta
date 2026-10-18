@@ -17,6 +17,7 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
   const miniMapContainerRef = useRef(null);
   const miniMapInstanceRef = useRef(null);
   const markerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Inicializa o mini-mapa interativo dentro do modal
   useEffect(() => {
@@ -50,7 +51,6 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
       miniMapInstanceRef.current = mapa;
     }
 
-    // Garante que o mapa redesenhe o tamanho correto quando a janela modal abre
     const timer = setTimeout(() => {
       miniMapInstanceRef.current?.invalidateSize();
     }, 250);
@@ -152,6 +152,32 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
       }
     } catch {
       setStatusBusca("Não foi possível buscar as coordenadas no momento.");
+    }
+  };
+
+  // Upload e conversão do arquivo de imagem para Base64
+  const handleFileChange = (e) => {
+    const arquivo = e.target.files[0];
+    if (!arquivo) return;
+
+    // Limite de 2MB para não sobrecarregar o localStorage
+    if (arquivo.size > 2 * 1024 * 1024) {
+      alert("A imagem selecionada é muito grande. Escolha uma foto de até 2MB.");
+      e.target.value = "";
+      return;
+    }
+
+    const leitor = new FileReader();
+    leitor.onloadend = () => {
+      setFotoUrl(leitor.result);
+    };
+    leitor.readAsDataURL(arquivo);
+  };
+
+  const handleRemoverFoto = () => {
+    setFotoUrl("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -311,14 +337,57 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
             </small>
           </div>
 
+          {/* Upload de Foto do Dispositivo com Preview */}
           <div className="input-group">
-            <label>URL da Foto (opcional)</label>
+            <label>Foto do Problema (Upload do Dispositivo)</label>
             <input
-              type="url"
-              placeholder="https://exemplo.com/foto.jpg"
-              value={fotoUrl}
-              onChange={(e) => setFotoUrl(e.target.value)}
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              style={{ padding: "0.4rem" }}
             />
+
+            {fotoUrl && (
+              <div style={{ marginTop: "0.8rem", position: "relative", width: "fit-content" }}>
+                <img
+                  src={fotoUrl}
+                  alt="Pré-visualização do problema"
+                  style={{
+                    width: "100%",
+                    maxWidth: "320px",
+                    maxHeight: "180px",
+                    objectFit: "cover",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border)",
+                    display: "block",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoverFoto}
+                  style={{
+                    position: "absolute",
+                    top: "6px",
+                    right: "6px",
+                    backgroundColor: "rgba(0, 0, 0, 0.65)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "26px",
+                    height: "26px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.85rem",
+                  }}
+                  title="Remover foto"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="input-group">
