@@ -1,32 +1,183 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
   const [titulo, setTitulo] = useState("");
   const [categoria, setCategoria] = useState("Vazamento de Esgoto");
+  const [cep, setCep] = useState("");
   const [bairro, setBairro] = useState(usuario?.bairro || "");
-  const [endereco, setEndereco] = useState("");
+  const [cidade, setCidade] = useState("Recife");
+  const [rua, setRua] = useState("");
+  const [numero, setNumero] = useState("");
   const [descricao, setDescricao] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
+
+  const [coords, setCoords] = useState(null);
+  const [statusBusca, setStatusBusca] = useState("");
+
+  const miniMapContainerRef = useRef(null);
+  const miniMapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
+
+  // Inicializa o mini-mapa interativo dentro do modal
+  useEffect(() => {
+    const L = window.L;
+    if (!L || !miniMapContainerRef.current) return;
+
+    if (!miniMapInstanceRef.current) {
+      const centroInicial = [-8.05, -34.9];
+      const mapa = L.map(miniMapContainerRef.current).setView(centroInicial, 12);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(mapa);
+
+      // Permite clicar no mapa para marcar ou mover o pino
+      mapa.on("click", (e) => {
+        const { lat, lng } = e.latlng;
+        setCoords({ lat, lng });
+
+        if (markerRef.current) {
+          markerRef.current.setLatLng([lat, lng]);
+        } else {
+          markerRef.current = L.marker([lat, lng], { draggable: true }).addTo(mapa);
+          markerRef.current.on("dragend", (ev) => {
+            const novaPos = ev.target.getLatLng();
+            setCoords({ lat: novaPos.lat, lng: novaPos.lng });
+          });
+        }
+      });
+
+      miniMapInstanceRef.current = mapa;
+    }
+
+    // Garante que o mapa redesenhe o tamanho correto quando a janela modal abre
+    const timer = setTimeout(() => {
+      miniMapInstanceRef.current?.invalidateSize();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Move o pino e recentraliza o mapa
+  const atualizarPinoMapa = (lat, lng, zoom = 16) => {
+    const L = window.L;
+    const mapa = miniMapInstanceRef.current;
+    if (!mapa || !L) return;
+
+    setCoords({ lat, lng });
+    mapa.setView([lat, lng], zoom);
+
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+    } else {
+      markerRef.current = L.marker([lat, lng], { draggable: true }).addTo(mapa);
+      markerRef.current.on("dragend", (ev) => {
+        const novaPos = ev.target.getLatLng();
+        setCoords({ lat: novaPos.lat, lng: novaPos.lng });
+      });
+    }
+  };
+
+  // 1. Localização por GPS do dispositivo
+  const obterLocalizacaoGPS = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocalização não suportada no seu navegador.");
+      return;
+    }
+
+    setStatusBusca("Obtendo GPS...");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        atualizarPinoMapa(latitude, longitude, 16);
+        setStatusBusca("Localização marcada via GPS!");
+      },
+      () => {
+        setStatusBusca("Falha no GPS. Busque por CEP ou clique no mapa.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // 2. Consulta automática pelo CEP (ViaCEP)
+  const buscarPorCep = async (valorCep) => {
+    setCep(valorCep);
+    const cepLimpo = valorCep.replace(/\D/g, "");
+
+    if (cepLimpo.length === 8) {
+      setStatusBusca("Consultando CEP...");
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+        const dados = await res.json();
+
+        if (!dados.erro) {
+          if (dados.logradouro) setRua(dados.logradouro);
+          if (dados.bairro) setBairro(dados.bairro);
+          if (dados.localidade) setCidade(dados.localidade);
+
+          const consultaEndereco = `${dados.logradouro || ""}, ${dados.bairro || ""}, ${dados.localidade || "Recife"}`;
+          geocodificarEndereco(consultaEndereco);
+        } else {
+          setStatusBusca("CEP não encontrado.");
+        }
+      } catch {
+        setStatusBusca("Erro ao consultar o serviço de CEP.");
+      }
+    }
+  };
+
+  // 3. Geocodificação pelo Nominatim (OpenStreetMap)
+  const geocodificarEndereco = async (textoEndereco) => {
+    const consulta =
+      textoEndereco ||
+      `${rua}${numero ? `, ${numero}` : ""}, ${bairro}, ${cidade}`;
+
+    if (!consulta.replace(/,/g, "").trim()) return;
+
+    setStatusBusca("Localizando no mapa...");
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        consulta
+      )}`;
+      const res = await fetch(url);
+      const resultados = await res.json();
+
+      if (resultados && resultados.length > 0) {
+        const lat = parseFloat(resultados[0].lat);
+        const lng = parseFloat(resultados[0].lon);
+        atualizarPinoMapa(lat, lng, 16);
+        setStatusBusca("Localização encontrada e marcada!");
+      } else {
+        setStatusBusca("Endereço aproximado. Ajuste o pino clicando no mapa.");
+      }
+    } catch {
+      setStatusBusca("Não foi possível buscar as coordenadas no momento.");
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!titulo || !endereco || !descricao) {
-      alert("Por favor, preencha todos os campos obrigatórios.");
+    if (!titulo || !rua || !bairro || !descricao) {
+      alert("Por favor, preencha todos os campos obrigatórios (*).");
       return;
     }
+
+    const enderecoCompleto = `${rua}${numero ? `, nº ${numero}` : ""} — ${bairro}, ${cidade}`;
 
     const novaDenuncia = {
       id: Date.now(),
       titulo,
       categoria,
       bairro,
-      endereco,
+      endereco: enderecoCompleto,
       descricao,
       fotoUrl: fotoUrl.trim(),
       status: "Pendente",
       apoios: 1,
-      autor: usuario.nome,
+      autor: usuario?.nome || "Cidadão Anônimo",
+      lat: coords?.lat || null,
+      lng: coords?.lng || null,
       data: new Date().toLocaleDateString("pt-BR"),
     };
 
@@ -36,14 +187,14 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
+      <div className="modal-content" style={{ maxWidth: "580px" }}>
         <h2 style={{ marginBottom: "1rem" }}>Registrar Nova Ocorrência</h2>
         <form onSubmit={handleSubmit}>
           <div className="input-group">
             <label>Título do Problema *</label>
             <input
               type="text"
-              placeholder="Ex: Esgoto vazando próximo à praça"
+              placeholder="Ex: Vazamento de esgoto na calçada"
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               required
@@ -61,33 +212,110 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
             </select>
           </div>
 
-          <div className="input-group">
-            <label>Bairro *</label>
-            <input
-              type="text"
-              placeholder="Ex: Boa Vista"
-              value={bairro}
-              onChange={(e) => setBairro(e.target.value)}
-              required
-            />
+          {/* Busca por CEP e Bairro */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
+            <div className="input-group">
+              <label>CEP (Preenchimento Rápido)</label>
+              <input
+                type="text"
+                placeholder="Ex: 50740-000"
+                value={cep}
+                onChange={(e) => buscarPorCep(e.target.value)}
+                maxLength={9}
+              />
+            </div>
+            <div className="input-group">
+              <label>Bairro *</label>
+              <input
+                type="text"
+                placeholder="Ex: Várzea"
+                value={bairro}
+                onChange={(e) => setBairro(e.target.value)}
+                required
+              />
+            </div>
           </div>
 
+          {/* Rua e Número */}
+          <div style={{ display: "grid", gridTemplateColumns: "2.5fr 1fr", gap: "0.8rem" }}>
+            <div className="input-group">
+              <label>Rua / Logradouro *</label>
+              <input
+                type="text"
+                placeholder="Ex: Rua Acadêmico Hélio Ramos"
+                value={rua}
+                onChange={(e) => setRua(e.target.value)}
+                required
+              />
+            </div>
+            <div className="input-group">
+              <label>Número / Ref.</label>
+              <input
+                type="text"
+                placeholder="Ex: 120"
+                value={numero}
+                onChange={(e) => setNumero(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.8rem" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => geocodificarEndereco()}
+              style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
+            >
+              🔍 Localizar endereço no mapa
+            </button>
+          </div>
+
+          {/* Mini-mapa interativo com suporte a GPS e clique */}
           <div className="input-group">
-            <label>Endereço / Referência *</label>
-            <input
-              type="text"
-              placeholder="Ex: Rua das Flores, em frente ao nº 120"
-              value={endereco}
-              onChange={(e) => setEndereco(e.target.value)}
-              required
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
+              <label>Marque o ponto exato no mapa:</label>
+              <button
+                type="button"
+                onClick={obterLocalizacaoGPS}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--primary)",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                }}
+              >
+                📍 Usar meu GPS
+              </button>
+            </div>
+
+            <div
+              ref={miniMapContainerRef}
+              style={{
+                height: "200px",
+                width: "100%",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                backgroundColor: "#e2e8f0",
+                zIndex: 1,
+              }}
             />
+
+            <small style={{ color: "var(--text-muted)", marginTop: "0.3rem", display: "block" }}>
+              {statusBusca
+                ? statusBusca
+                : coords
+                ? `Pino posicionado em: (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}) — você pode arrastar o pino.`
+                : "Clique no mapa para colocar o pino onde está o problema."}
+            </small>
           </div>
 
           <div className="input-group">
             <label>URL da Foto (opcional)</label>
             <input
               type="url"
-              placeholder="https://exemplo.com/imagem.jpg"
+              placeholder="https://exemplo.com/foto.jpg"
               value={fotoUrl}
               onChange={(e) => setFotoUrl(e.target.value)}
             />
@@ -97,7 +325,7 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
             <label>Descrição Detalhada *</label>
             <textarea
               rows="3"
-              placeholder="Descreva o impacto do problema para o bairro..."
+              placeholder="Descreva o problema e detalhes para localização..."
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
               required
