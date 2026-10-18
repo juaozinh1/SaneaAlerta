@@ -2,18 +2,20 @@ import { useState, useEffect } from "react";
 import Navbar from "./components/Navbar.jsx";
 import ModalDenuncia from "./components/ModalDenuncia.jsx";
 import Feed from "./pages/Feed.jsx";
+import PainelGestor from "./pages/PainelGestor.jsx";
 import Login from "./pages/Login.jsx";
 import Cadastro from "./pages/Cadastro.jsx";
 
 const DADOS_INICIAIS = [
   {
     id: 1,
+    numeroSei: "23067.001042/2026-81",
     titulo: "Esgoto a céu aberto na calçada",
     categoria: "Vazamento de Esgoto",
     bairro: "Várzea",
     endereco: "Rua Acadêmico Hélio Ramos, 120 — Várzea, Recife",
-    descricao: "Vazamento contínuo há mais de 4 dias gerando forte odor próximo ao ponto de ônibus.",
-    fotoUrl: "https://images.unsplash.com/photo-1542385151-efd9000785a0?w=600&auto=format&fit=crop&q=60",
+    descricao: "Vazamento contínuo gerando forte odor próximo ao ponto de ônibus.",
+    fotoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfv7hy4ZTXy7du00dCys9dnai7NWeo3ZKtN6rkloJb1U7dSpB7CuYwp470&s=10",
     status: "Pendente",
     apoios: 12,
     autor: "Carlos Silva",
@@ -22,17 +24,33 @@ const DADOS_INICIAIS = [
   },
   {
     id: 2,
+    numeroSei: "23067.001043/2026-15",
     titulo: "Tubulação rompida jorrando água limpa",
     categoria: "Falta de Água",
     bairro: "Boa Viagem",
     endereco: "Av. Conselheiro Aguiar, 1400 — Boa Viagem, Recife",
-    descricao: "Cano quebrado desperdiçando grande quantidade de água tratada na pista.",
-    fotoUrl: "https://images.unsplash.com/photo-1584463699042-494bcf9db7f0?w=600&auto=format&fit=crop&q=60",
+    descricao: "Cano quebrado desperdiçando grande quantidade de água tratada.",
+    fotoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQvAwdtcLq-GRrxTJuPhg-8ArewtGVnuB5psFRHaszGqTsfEeI_-woRm39-&s=10",
     status: "Em Análise",
     apoios: 27,
     autor: "Mariana Souza",
     lat: -8.1158,
     lng: -34.8988,
+  },
+  {
+    id: 3,
+    numeroSei: "23067.001044/2026-62",
+    titulo: "Acúmulo de entulho e esgoto represado",
+    categoria: "Acúmulo de Lixo",
+    bairro: "Várzea",
+    endereco: "Rua do Hospício, 45 — Várzea, Recife",
+    descricao: "Boca de lobo entupida com lixo gerando poça de contaminação.",
+    fotoUrl: "",
+    status: "Em Execução",
+    apoios: 8,
+    autor: "Roberto Dias",
+    lat: -8.0521,
+    lng: -34.9511,
   },
 ];
 
@@ -42,6 +60,7 @@ export default function App() {
   });
   const [telaAuth, setTelaAuth] = useState("login");
   const [modalAberto, setModalAberto] = useState(false);
+  const [visao, setVisao] = useState("cidadao"); // 'cidadao' ou 'gestor'
 
   const [denuncias, setDenuncias] = useState(() => {
     const dadosSalvos = localStorage.getItem("sanea_denuncias");
@@ -63,7 +82,10 @@ export default function App() {
   };
 
   const handleSalvarDenuncia = (nova) => {
-    setDenuncias([nova, ...denuncias]);
+    // Gera automaticamente um número de processo SEI simulado
+    const numeroSeiAuto = `23067.${String(Math.floor(1000 + Math.random() * 9000))}/2026-${Math.floor(10 + Math.random() * 89)}`;
+    const denunciaComSei = { ...nova, numeroSei: numeroSeiAuto };
+    setDenuncias([denunciaComSei, ...denuncias]);
   };
 
   const handleApoiar = (id) => {
@@ -81,10 +103,23 @@ export default function App() {
     }
   };
 
+  // Atualização de status e despacho pelo Gestor
+  const handleAtualizarStatus = (id, novoStatus, despacho) => {
+    setDenuncias((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, status: novoStatus, despacho: despacho }
+          : item
+      )
+    );
+  };
+
   return (
-    <div>
+    <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <Navbar
         usuario={usuario}
+        visaoAtual={visao}
+        onMudarVisao={setVisao}
         onLogout={handleLogout}
         onAbrirModal={() => setModalAberto(true)}
       />
@@ -101,6 +136,11 @@ export default function App() {
             onIrParaLogin={() => setTelaAuth("login")}
           />
         )
+      ) : visao === "gestor" ? (
+        <PainelGestor
+          denuncias={denuncias}
+          onAtualizarStatus={handleAtualizarStatus}
+        />
       ) : (
         <Feed
           denuncias={denuncias}
