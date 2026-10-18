@@ -19,7 +19,6 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
   const markerRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Inicializa o mini-mapa interativo dentro do modal
   useEffect(() => {
     const L = window.L;
     if (!L || !miniMapContainerRef.current) return;
@@ -32,7 +31,6 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
         attribution: "&copy; OpenStreetMap",
       }).addTo(mapa);
 
-      // Permite clicar no mapa para marcar ou mover o pino
       mapa.on("click", (e) => {
         const { lat, lng } = e.latlng;
         setCoords({ lat, lng });
@@ -58,7 +56,6 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Move o pino e recentraliza o mapa
   const atualizarPinoMapa = (lat, lng, zoom = 16) => {
     const L = window.L;
     const mapa = miniMapInstanceRef.current;
@@ -78,7 +75,6 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
     }
   };
 
-  // 1. Localização por GPS do dispositivo
   const obterLocalizacaoGPS = () => {
     if (!navigator.geolocation) {
       alert("Geolocalização não suportada no seu navegador.");
@@ -99,7 +95,6 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
     );
   };
 
-  // 2. Consulta automática pelo CEP (ViaCEP)
   const buscarPorCep = async (valorCep) => {
     setCep(valorCep);
     const cepLimpo = valorCep.replace(/\D/g, "");
@@ -126,7 +121,6 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
     }
   };
 
-  // 3. Geocodificação pelo Nominatim (OpenStreetMap)
   const geocodificarEndereco = async (textoEndereco) => {
     const consulta =
       textoEndereco ||
@@ -148,19 +142,17 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
         atualizarPinoMapa(lat, lng, 16);
         setStatusBusca("Localização encontrada e marcada!");
       } else {
-        setStatusBusca("Endereço aproximado. Ajuste o pino clicando no mapa.");
+        setStatusBusca("Endereço aproximado. Ajuste o pino no mapa.");
       }
     } catch {
       setStatusBusca("Não foi possível buscar as coordenadas no momento.");
     }
   };
 
-  // Upload e conversão do arquivo de imagem para Base64
   const handleFileChange = (e) => {
     const arquivo = e.target.files[0];
     if (!arquivo) return;
 
-    // Limite de 2MB para não sobrecarregar o localStorage
     if (arquivo.size > 2 * 1024 * 1024) {
       alert("A imagem selecionada é muito grande. Escolha uma foto de até 2MB.");
       e.target.value = "";
@@ -212,24 +204,50 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: "580px" }}>
-        <h2 style={{ marginBottom: "1rem" }}>Registrar Nova Ocorrência</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="input-group">
-            <label>Título do Problema *</label>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white border border-zinc-200/80 rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 my-auto">
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-100 mb-5">
+          <div>
+            <h2 className="text-lg font-bold text-zinc-900 tracking-tight">
+              Registrar Nova Ocorrência
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Preencha os dados e posicione o local no mapa cívico
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition-colors text-sm"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-semibold text-zinc-700 mb-1">
+              Título do Problema *
+            </label>
             <input
               type="text"
               placeholder="Ex: Vazamento de esgoto na calçada"
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               required
+              className="w-full px-3 py-2 text-xs bg-zinc-50/50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-zinc-800 transition-all placeholder:text-zinc-400"
             />
           </div>
 
-          <div className="input-group">
-            <label>Categoria</label>
-            <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+          <div>
+            <label className="block font-semibold text-zinc-700 mb-1">
+              Categoria
+            </label>
+            <select
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-zinc-50/50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-zinc-800 cursor-pointer"
+            >
               <option value="Vazamento de Esgoto">Vazamento de Esgoto</option>
               <option value="Falta de Água">Falta de Água Potável</option>
               <option value="Buraco na Via">Buraco / Pavimentação</option>
@@ -238,79 +256,82 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
             </select>
           </div>
 
-          {/* Busca por CEP e Bairro */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
-            <div className="input-group">
-              <label>CEP (Preenchimento Rápido)</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold text-zinc-700 mb-1">
+                CEP (Autocompletar)
+              </label>
               <input
                 type="text"
                 placeholder="Ex: 50740-000"
                 value={cep}
                 onChange={(e) => buscarPorCep(e.target.value)}
                 maxLength={9}
+                className="w-full px-3 py-2 text-xs bg-zinc-50/50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-zinc-800 transition-all placeholder:text-zinc-400"
               />
             </div>
-            <div className="input-group">
-              <label>Bairro *</label>
+            <div>
+              <label className="block font-semibold text-zinc-700 mb-1">
+                Bairro *
+              </label>
               <input
                 type="text"
                 placeholder="Ex: Várzea"
                 value={bairro}
                 onChange={(e) => setBairro(e.target.value)}
                 required
+                className="w-full px-3 py-2 text-xs bg-zinc-50/50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-zinc-800 transition-all placeholder:text-zinc-400"
               />
             </div>
           </div>
 
-          {/* Rua e Número */}
-          <div style={{ display: "grid", gridTemplateColumns: "2.5fr 1fr", gap: "0.8rem" }}>
-            <div className="input-group">
-              <label>Rua / Logradouro *</label>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block font-semibold text-zinc-700 mb-1">
+                Rua / Logradouro *
+              </label>
               <input
                 type="text"
                 placeholder="Ex: Rua Acadêmico Hélio Ramos"
                 value={rua}
                 onChange={(e) => setRua(e.target.value)}
                 required
+                className="w-full px-3 py-2 text-xs bg-zinc-50/50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-zinc-800 transition-all placeholder:text-zinc-400"
               />
             </div>
-            <div className="input-group">
-              <label>Número / Ref.</label>
+            <div>
+              <label className="block font-semibold text-zinc-700 mb-1">
+                Número / Ref.
+              </label>
               <input
                 type="text"
                 placeholder="Ex: 120"
                 value={numero}
                 onChange={(e) => setNumero(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-zinc-50/50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-zinc-800 transition-all placeholder:text-zinc-400"
               />
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.8rem" }}>
+          <div className="flex justify-end">
             <button
               type="button"
-              className="btn btn-secondary"
               onClick={() => geocodificarEndereco()}
-              style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
+              className="text-xs font-semibold text-sky-600 hover:text-sky-700 hover:underline"
             >
-              🔍 Localizar endereço no mapa
+              🔍 Localizar endereço digitado no mapa
             </button>
           </div>
 
-          {/* Mini-mapa interativo com suporte a GPS e clique */}
-          <div className="input-group">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
-              <label>Marque o ponto exato no mapa:</label>
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="font-semibold text-zinc-700">
+                Ponto Exato no Mapa
+              </label>
               <button
                 type="button"
                 onClick={obterLocalizacaoGPS}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--primary)",
-                  cursor: "pointer",
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                }}
+                className="text-xs font-semibold text-sky-600 hover:text-sky-700"
               >
                 📍 Usar meu GPS
               </button>
@@ -318,70 +339,42 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
 
             <div
               ref={miniMapContainerRef}
-              style={{
-                height: "200px",
-                width: "100%",
-                borderRadius: "8px",
-                border: "1px solid var(--border)",
-                backgroundColor: "#e2e8f0",
-                zIndex: 1,
-              }}
+              className="h-44 w-full rounded-xl border border-zinc-200 bg-zinc-100 overflow-hidden"
+              style={{ zIndex: 1 }}
             />
 
-            <small style={{ color: "var(--text-muted)", marginTop: "0.3rem", display: "block" }}>
+            <span className="block text-[11px] text-zinc-400 mt-1">
               {statusBusca
                 ? statusBusca
                 : coords
-                ? `Pino posicionado em: (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}) — você pode arrastar o pino.`
-                : "Clique no mapa para colocar o pino onde está o problema."}
-            </small>
+                ? `Pino posicionado: (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}) — você pode arrastar o pino.`
+                : "Clique no mapa para posicionar o pino exato do problema."}
+            </span>
           </div>
 
-          {/* Upload de Foto do Dispositivo com Preview */}
-          <div className="input-group">
-            <label>Foto do Problema (Upload do Dispositivo)</label>
+          <div>
+            <label className="block font-semibold text-zinc-700 mb-1">
+              Foto do Problema (Upload do Dispositivo)
+            </label>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
               onChange={handleFileChange}
-              style={{ padding: "0.4rem" }}
+              className="w-full text-xs text-zinc-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 cursor-pointer"
             />
 
             {fotoUrl && (
-              <div style={{ marginTop: "0.8rem", position: "relative", width: "fit-content" }}>
+              <div className="relative mt-2.5 w-fit">
                 <img
                   src={fotoUrl}
-                  alt="Pré-visualização do problema"
-                  style={{
-                    width: "100%",
-                    maxWidth: "320px",
-                    maxHeight: "180px",
-                    objectFit: "cover",
-                    borderRadius: "8px",
-                    border: "1px solid var(--border)",
-                    display: "block",
-                  }}
+                  alt="Prévia"
+                  className="w-48 h-28 object-cover rounded-lg border border-zinc-200"
                 />
                 <button
                   type="button"
                   onClick={handleRemoverFoto}
-                  style={{
-                    position: "absolute",
-                    top: "6px",
-                    right: "6px",
-                    backgroundColor: "rgba(0, 0, 0, 0.65)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "50%",
-                    width: "26px",
-                    height: "26px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "0.85rem",
-                  }}
+                  className="absolute top-1.5 right-1.5 w-5 h-5 bg-zinc-900/70 hover:bg-zinc-900 text-white rounded-full flex items-center justify-center text-[10px]"
                   title="Remover foto"
                 >
                   ✕
@@ -390,22 +383,32 @@ export default function ModalDenuncia({ usuario, onClose, onSalvar }) {
             )}
           </div>
 
-          <div className="input-group">
-            <label>Descrição Detalhada *</label>
+          <div>
+            <label className="block font-semibold text-zinc-700 mb-1">
+              Descrição Detalhada *
+            </label>
             <textarea
               rows="3"
               placeholder="Descreva o problema e detalhes para localização..."
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
               required
+              className="w-full px-3 py-2 text-xs bg-zinc-50/50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-zinc-800 transition-all placeholder:text-zinc-400"
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+            >
               Cancelar
             </button>
-            <button type="submit" className="btn btn-primary">
+            <button
+              type="submit"
+              className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-700 active:scale-[0.98] rounded-lg transition-all shadow-sm shadow-sky-600/20"
+            >
               Publicar Denúncia
             </button>
           </div>
