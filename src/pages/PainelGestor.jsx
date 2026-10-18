@@ -193,7 +193,7 @@ export default function PainelGestor({ denuncias, onAtualizarStatus }) {
                   : "text-zinc-600 hover:text-zinc-900"
               }`}
             >
-              🔥 Mapa de Calor (Heatmap)
+              Mapa de Calor (Heatmap)
             </button>
             <button
               type="button"
@@ -204,7 +204,7 @@ export default function PainelGestor({ denuncias, onAtualizarStatus }) {
                   : "text-zinc-600 hover:text-zinc-900"
               }`}
             >
-              📍 Visualizar Pontos
+              📍Visualizar Pontos
             </button>
           </div>
         </div>
